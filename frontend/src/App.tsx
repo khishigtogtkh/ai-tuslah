@@ -39,7 +39,7 @@ export default function App() {
     return () => window.removeEventListener('session-expired', expired)
   }, [])
 
-  if (loading) return <div className="boot" role="status"><Brand /><p>Нэвтрэлтийг шалгаж байна…</p></div>
+  if (loading) return <div className="boot" role="status"><Brand /><p>Нэвтрэлтийг шалгаж байна 11</p></div>
   if (error) return <div className="boot"><Brand /><Notice>{error}</Notice>
     <button onClick={() => setAttempt(attempt + 1)}>Дахин оролдох</button></div>
   if (!admin) return <Routes><Route path="/login" element={<Login onLogin={setAdmin} />} />
