@@ -47,7 +47,7 @@ export default function App() {
   return <div className="app-shell">
     <a className="skip-link" href="#main">Агуулга руу очих</a>
     <aside className="sidebar"><Brand /><p className="nav-label">УДИРДЛАГА</p>
-      <Link className="nav-item" to="/tenants" aria-current="page"><span aria-hidden="true">▦</span> Tenant бүртгэл</Link>
+      <Link className="nav-item" to="/tenants" aria-current="page"><span aria-hidden="true">▦</span> Tenant бүртгэл 33</Link>
       <div className="sidebar-footer"><span className="avatar">A</span><div>Платформын админ<small>{admin.email}</small></div></div>
     </aside>
     <div className="workspace"><header className="topbar"><span>Удирдлагын хэсэг</span><span className="role-label">Платформын админ</span></header>
