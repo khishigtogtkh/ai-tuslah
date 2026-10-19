@@ -163,7 +163,7 @@ function TenantForm({ onCancel, onCreated }: { onCancel: () => void; onCreated: 
       if (err instanceof ApiError) setFields(err.fields)
     } finally { setBusy(false) }
   }
-  return <section className="create-section" aria-labelledby="create-title"><div className="section-heading"><h2 id="create-title">Шинэ Tenant</h2>
+  return <section className="create-section" aria-labelledby="create-title"><div className="section-heading"><h2 id="create-title">Шинэ Tenant 22</h2>
     <span className="subtle">* Заавал бөглөх</span></div>
     <form onSubmit={submit} aria-busy={busy}><div className="form-grid">
       <div><label htmlFor="tenant-name">Компанийн нэр *</label><input id="tenant-name" name="name" required maxLength={200} autoFocus disabled={busy}
