@@ -1,0 +1,10 @@
+.env
+.env.*
+!.env.example
+.tools/
+node_modules/
+dist/
+bin/
+obj/
+.vs/
+*.user
