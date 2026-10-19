@@ -8,3 +8,6 @@ bin/
 obj/
 .vs/
 *.user
+.data/
+.logs/
+.prisma/

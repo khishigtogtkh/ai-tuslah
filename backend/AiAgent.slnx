@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/AiAgent.Api/AiAgent.Api.csproj" />
+    <Project Path="src/AiAgent.Application/AiAgent.Application.csproj" />
+    <Project Path="src/AiAgent.Domain/AiAgent.Domain.csproj" />
+    <Project Path="src/AiAgent.Infrastructure/AiAgent.Infrastructure.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,16 @@
+{
+  "name": "ai-agent-local-tools",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npm --prefix frontend run dev",
+    "db:studio": "docker compose up -d --wait db && prisma studio --port 5555"
+  },
+  "devDependencies": {
+    "prisma": "7.10.1"
+  },
+  "engines": {
+    "node": ">=22.12.0 <23"
+  }
+}

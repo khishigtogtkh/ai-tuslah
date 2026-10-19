@@ -18,5 +18,28 @@ services:
       timeout: 5s
       retries: 12
 
+  be:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_HTTP_PORTS: "8080"
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      AI_AGENT_DATA_DIR: /var/lib/ai-agent
+    ports:
+      - "127.0.0.1:5000:8080"
+    volumes:
+      - backend_data:/var/lib/ai-agent
+
 volumes:
   postgres_data:
+  backend_data:

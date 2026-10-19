@@ -1,0 +1,11 @@
+# Only the backend and SDK selection enter the build context.
+**
+!global.json
+!backend/
+!backend/**
+**/bin/
+**/obj/
+**/.data/
+**/.logs/
+**/.env
+**/.env.*
