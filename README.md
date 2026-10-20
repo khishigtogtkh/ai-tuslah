@@ -13,7 +13,7 @@ License нь дараагийн хэсэгт `active` / `inactive` төлөвт�
 - `frontend` — React + TypeScript + Vite, Монгол хэлтэй гурван дэлгэц.
 - `scripts/backend.sh` — локал SDK, `.env`, Data Protection тохиргоог ачаалах wrapper.
 
-Автомат тест, тестийн төсөл, Playwright нэмээгүй.
+Frontend-ийн API client-ийн unit тест болон GitHub Actions CI нэмсэн. Backend-ийн тестийн төсөл, Playwright байхгүй.
 
 ## Орчин
 
@@ -181,13 +181,18 @@ Production deployment энэ ажлын хүрээнд хийгдээгүй. Dep
 ## Локал шалгалт
 
 ```bash
-bash scripts/backend.sh build backend/AiAgent.slnx --no-restore
+bash scripts/backend.sh restore backend/AiAgent.slnx --locked-mode
+bash scripts/backend.sh build backend/AiAgent.slnx --configuration Release --no-restore
 cd frontend
+npm ci
+npm test
 npm run typecheck
 npm run build
 ```
 
-Автомат тест ажиллуулахгүй. Browser-оор нэвтрэх, Tenant үүсгэх, жагсаалт, дэлгэрэнгүй, refresh ажиллагааг гараар шалгана. API-аар нэвтрэлтгүй хандалт, буруу login, CSRF-гүй POST, буруу Tenant өгөгдлийг шалгаж болно. Database-аас Tenant болон audit хамт үүссэнийг, restart-аас хойш өгөгдөл болон session хадгалагдсаныг батална.
+`npm test` нь Vitest-ээр `frontend/src/api.test.ts`-ийг нэг удаа ажиллуулаад дуусна. GET/POST, CSRF, validation болон HTTP алдаа, session-expired event, сүлжээний алдаа, AbortError-ийг шалгана. Тестүүд Node орчинд mock fetch ашигладаг тул backend, database, админы бүртгэл шаардахгүй.
+
+Browser-оор нэвтрэх, Tenant үүсгэх, жагсаалт, дэлгэрэнгүй, refresh ажиллагааг гараар шалгана. API-аар нэвтрэлтгүй хандалт, буруу login, CSRF-гүй POST, буруу Tenant өгөгдлийг шалгаж болно. Database-аас Tenant болон audit хамт үүссэнийг, restart-аас хойш өгөгдөл болон session хадгалагдсаныг батална.
 
 PostgreSQL өгөгдөл `ai-agent_postgres_data` volume-д хадгалагдана. Энгийн зогсоолтод `docker compose stop` ашиглана. `docker compose down -v` нь өгөгдөл устгадаг тул ашиглахгүй.
 
@@ -199,7 +204,7 @@ PostgreSQL өгөгдөл `ai-agent_postgres_data` volume-д хадгалагд�
 - Локал frontend proxy-оор login, session, Tenant үүсгэх/жагсаах/дэлгэрэнгүй хүсэлт амжилттай. Нэвтрэлтгүй хүсэлт 401, CSRF-гүй POST болон буруу өгөгдөл 400, олдоогүй Tenant 404 буцаасан.
 - Нэг локал шалгалтын Tenant, түүнтэй зөв холбоостой нэг audit үүссэн. Backend restart-ийн дараа session болон Tenant хоёулаа хадгалагдсан.
 - Локал админы имэйл, санамсаргүй нууц үг `.data/local-admin.json` дотор 0600 эрхтэй хадгалагдсан; Git-д орохгүй. Энэ нь зөвхөн энэ workspace-ийн локал бүртгэл, application-ийн default account биш.
-- Browser-ийн бодит дүрслэл, production deployment болон backup/restore шалгаагүй. Автомат тест бичээгүй, ажиллуулаагүй.
+- Browser-ийн бодит дүрслэл, production deployment болон backup/restore шалгаагүй. Энэ анхны хэрэгжилтийн шалгалтад автомат тест байгаагүй.
 
 ## Docker локал ажиллагааны баталгаажуулалт — 2026-10-20
 
@@ -207,4 +212,39 @@ PostgreSQL өгөгдөл `ai-agent_postgres_data` volume-д хадгалагд�
 - `docker compose up -d` нь DB болон backend-ийг асаасан. Backend нь DB healthy болсны дараа эхэлж, зөвхөн `127.0.0.1:5000` портод нээлттэй.
 - Root-ийн `npm run dev` frontend-ийг асаасан. Frontend proxy-оор CSRF, админ login, session, Tenant жагсаалт HTTP 200; нэвтрэлтгүй Tenant хүсэлт HTTP 401 буцаасан.
 - Backend container restart-ийн дараа өмнөх session болон Tenant өгөгдөл хадгалагдсан. Шалгалтаар шинэ Tenant үүсгээгүй.
-- Browser-ийн дүрслэл болон production deployment шалгаагүй; автомат тест нэмээгүй.
+- Browser-ийн дүрслэл болон production deployment шалгаагүй; энэ Docker шалгалтад автомат тест ашиглаагүй.
+
+## GitHub Actions CI — Лаборатори 7
+
+Жишиг жижиг төслийн оронд одоогийн React + .NET төслийг ашиглана. `.github/workflows/ci.yml` нь бүх салбарын `push`, мөн Pull Request нээх, дахин нээх, commit нэмэх үед ажиллана. Нээлттэй PR-ийн салбар руу push хийхэд push болон PR тус бүрийн run харагдах нь хэвийн.
+
+Хоёр job `ubuntu-latest` дээр тусдаа, 15 минутын хязгаартай ажиллана:
+
+| Job | Алхмууд |
+| --- | --- |
+| Frontend test and build | Checkout → `.nvmrc`-ийн Node → `npm ci` → `npm test` → `npm run typecheck` → `npm run build` |
+| Backend build | Checkout → `global.json`-ийн .NET SDK → locked restore → Release build |
+
+Frontend командууд `frontend/` дотор, backend командууд root-оос ажиллана. npm cache нь frontend lockfile-аас түлхүүрээ авна. Workflow нь repository contents унших эрхтэй; database, `.env`, repository secret шаардахгүй. Deploy, migration, Docker build болон backend тест ажиллуулахгүй.
+
+Локал баталгаажуулалт — 2026-10-20: цэвэр `npm ci`, API-ийн 13/13 unit тест, frontend typecheck болон production build амжилттай. Backend locked restore болон Release build амжилттай, 0 warning / 0 error. Workflow YAML болон `push`, `pull_request` trigger-ийг шалгасан.
+
+Эхний GET тестийн expected URL-ийг түр `/api/wrong-tenants` болгоход 1 тест унаж, 12 тест амжилттай болсон; exit code 1, файл/мөр болон expected/received ялгаа гарсан. Тестийг сэргээсний дараа 13/13 дахин амжилттай болсон. Энэ нь локал баталгаажуулалт бөгөөд GitHub run-ийн нотолгоог орлохгүй.
+
+### GitHub дээр ногоон → улаан → дахин ногоон шалгах
+
+1. CI өөрчлөлтийг `main` руу commit/push хийнэ. Branch protection шаардвал PR-аар оруулна. Actions табаас `main`-ийн `CI` push run-д хоёр job ногоон болсныг шалгана.
+2. `main`-ээс `ci/failure-demo` салбар үүсгэнэ. `frontend/src/api.test.ts` дэх эхний GET тестийн хүлээгдэж буй `'/api/platform/tenants'` утгыг түр `'/api/wrong-tenants'` болгож, тусдаа commit/push хийнэ. Application-ийн кодыг өөрчлөхгүй.
+3. `ci/failure-demo` салбараас `main` руу PR нээж, `push` болон `pull_request` trigger хоёул ажилласныг шалгана.
+4. Улаан run-ийн `Frontend test and build` → `Test` алхмыг нээнэ. Тестийн нэр, файл/мөр, expected болон received утга, exit code 1-ийг тэмдэглэнэ. Дараагийн typecheck/build алхмууд skipped болох бөгөөд backend build тусдаа ажиллана.
+5. Тестийн утгыг буцааж засаж, тусдаа commit/push хийнэ. Push болон PR run-ууд дахин ногоон болсныг шалгана. Эвдэрсэн тесттэй commit-ийг `main` руу merge хийхгүй.
+6. Туршилтын PR-ийг merge хийхгүйгээр хаана. Run бүрийн холбоос, commit ID болон алдааны логийг лабораторийн нотолгоонд хадгалж, доорх хүснэгтэд GitHub дээр бодитоор баталгаажуулсан үр дүнг бүртгэнэ.
+
+Локал тест/build амжилттай болох нь GitHub runner дээр workflow ажилласныг батлахгүй. GitHub run-ийн үр дүн болон нотолгоо бүрдээгүй бол лабораторийн external баталгаажуулалт дуусаагүй байна.
+
+| Үе шат | Commit | Run холбоос | Үр дүн / нотолгоо |
+| --- | --- | --- | --- |
+| Эхний push | — | — | Хүлээгдэж байна |
+| Зориуд унагасан тест / push | — | — | Хүлээгдэж байна |
+| Зориуд унагасан тест / PR | — | — | Хүлээгдэж байна |
+| Засварын push / PR | — | — | Хүлээгдэж байна |
