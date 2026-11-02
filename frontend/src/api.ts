@@ -1,4 +1,13 @@
 export interface Admin { id: string; email: string }
+export interface License {
+  id: string
+  tenantId: string
+  status: 'active' | 'inactive'
+  version: string
+  createdAt: string
+  updatedAt: string | null
+  updatedByAdminId: string | null
+}
 export interface Tenant {
   id: string
   name: string
@@ -6,6 +15,7 @@ export interface Tenant {
   phone: string | null
   createdByAdminId: string
   createdAt: string
+  license: License
 }
 export interface TenantPage { items: Tenant[]; totalCount: number; page: number; pageSize: number }
 interface Problem { title?: string; errors?: Record<string, string[]>; traceId?: string }
@@ -40,6 +50,7 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
       : response.status >= 500 ? 'Серверийн алдаа гарлаа. Дараа дахин оролдоно уу.'
       : response.status === 400 ? 'Оруулсан мэдээллээ шалгана уу.'
       : response.status === 404 ? 'Tenant олдсонгүй.'
+      : response.status === 409 ? 'License өөрчлөгдсөн байна. Шинэ мэдээллийг шалгаад дахин оролдоно уу.'
       : response.status === 401 ? 'Имэйл эсвэл нууц үг буруу байна.'
       : 'Хүсэлтийг гүйцэтгэж чадсангүй.'
     throw new ApiError(response.status, message, problem.errors)

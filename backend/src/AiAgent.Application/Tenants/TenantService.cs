@@ -1,9 +1,10 @@
 using AiAgent.Domain;
+using AiAgent.Application.Licensing;
 
 namespace AiAgent.Application.Tenants;
 
 public sealed record TenantDto(Guid Id, string Name, string ContactEmail, string? Phone,
-    Guid CreatedByAdminId, DateTimeOffset CreatedAt);
+    Guid CreatedByAdminId, DateTimeOffset CreatedAt, LicenseDto License);
 public sealed record TenantPage(IReadOnlyList<TenantDto> Items, int TotalCount, int Page, int PageSize);
 
 public interface ITenantRepository
@@ -24,6 +25,7 @@ public sealed class TenantService(ITenantRepository repository)
     {
         var tenant = Tenant.Create(name, email, phone, actor);
         await repository.AddWithAuditAsync(tenant, AuditEvent.TenantCreated(tenant), ct);
-        return new(tenant.Id, tenant.Name, tenant.ContactEmail, tenant.Phone, tenant.CreatedByAdminId, tenant.CreatedAt);
+        return new(tenant.Id, tenant.Name, tenant.ContactEmail, tenant.Phone, tenant.CreatedByAdminId,
+            tenant.CreatedAt, LicenseDto.FromLicense(tenant.License));
     }
 }

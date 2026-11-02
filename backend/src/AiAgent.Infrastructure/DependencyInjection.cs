@@ -1,4 +1,5 @@
 using AiAgent.Application.Tenants;
+using AiAgent.Application.Licensing;
 using AiAgent.Infrastructure.Identity;
 using AiAgent.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
@@ -41,6 +42,8 @@ public static class DependencyInjection
             .AddSignInManager().AddDefaultTokenProviders();
         services.AddScoped<ITenantRepository, TenantRepository>();
         services.AddScoped<TenantService>();
+        services.AddScoped<ILicenseRepository, LicenseRepository>();
+        services.AddScoped<LicenseService>();
         return services;
     }
 }

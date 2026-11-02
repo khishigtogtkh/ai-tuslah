@@ -10,14 +10,20 @@ public sealed class Tenant
     public string? Phone { get; private set; }
     public Guid CreatedByAdminId { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
+    public License License { get; private set; } = null!;
 
-    public static Tenant Create(string name, string contactEmail, string? phone, Guid adminId) => new()
+    public static Tenant Create(string name, string contactEmail, string? phone, Guid adminId)
     {
-        Id = Guid.NewGuid(),
-        Name = name.Trim(),
-        ContactEmail = contactEmail.Trim(),
-        Phone = string.IsNullOrWhiteSpace(phone) ? null : phone.Trim(),
-        CreatedByAdminId = adminId,
-        CreatedAt = DateTimeOffset.UtcNow
-    };
+        var tenant = new Tenant
+        {
+            Id = Guid.NewGuid(),
+            Name = name.Trim(),
+            ContactEmail = contactEmail.Trim(),
+            Phone = string.IsNullOrWhiteSpace(phone) ? null : phone.Trim(),
+            CreatedByAdminId = adminId,
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+        tenant.License = License.Create(tenant.Id, tenant.CreatedAt);
+        return tenant;
+    }
 }

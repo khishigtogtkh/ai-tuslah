@@ -11,6 +11,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 {
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
+    public DbSet<License> Licenses => Set<License>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -25,6 +26,19 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.Property(x => x.Phone).HasMaxLength(32);
             entity.HasIndex(x => new { x.CreatedAt, x.Id });
             entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.CreatedByAdminId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+        builder.Entity<License>(entity =>
+        {
+            entity.ToTable("Licenses", table => table.HasCheckConstraint("CK_Licenses_Status",
+                "\"Status\" IN ('active', 'inactive')"));
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Status).HasMaxLength(8).IsRequired();
+            entity.Property(x => x.Version).IsConcurrencyToken();
+            entity.HasIndex(x => x.TenantId).IsUnique();
+            entity.HasOne<Tenant>().WithOne(x => x.License).HasForeignKey<License>(x => x.TenantId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.UpdatedByAdminId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
         builder.Entity<AuditEvent>(entity =>

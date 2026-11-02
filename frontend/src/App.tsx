@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, Navigate, Route, Routes, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api, ApiError, errorMessage } from './api'
-import type { Admin, Tenant, TenantPage } from './api'
+import type { Admin, License, Tenant, TenantPage } from './api'
 
 const date = (value: string) => new Intl.DateTimeFormat('mn-MN', {
   year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
@@ -15,6 +15,10 @@ function Brand() {
 
 function Notice({ children }: { children: React.ReactNode }) {
   return <div className="notice error" role="alert">{children}</div>
+}
+
+function LicenseStatus({ status }: { status: License['status'] }) {
+  return <span className={`license-status ${status}`}>{status === 'active' ? 'Идэвхтэй' : 'Идэвхгүй'}</span>
 }
 
 export default function App() {
@@ -128,9 +132,9 @@ function Tenants() {
       {loading ? <div className="empty-state" role="status">Бүртгэлийг ачаалж байна…</div>
         : error ? <div className="section-message"><Notice>{error}</Notice><button className="secondary" onClick={() => setRevision(value => value + 1)}>Дахин оролдох</button></div>
         : data && data.items.length > 0 ? <>
-          <div className="table-scroll"><table><thead><tr><th>Компанийн нэр</th><th>Холбоо барих имэйл</th><th>Бүртгэсэн огноо</th><th><span className="sr-only">Дэлгэрэнгүй</span></th></tr></thead>
+          <div className="table-scroll"><table><thead><tr><th>Компанийн нэр</th><th>Холбоо барих имэйл</th><th>License</th><th>Бүртгэсэн огноо</th><th><span className="sr-only">Дэлгэрэнгүй</span></th></tr></thead>
             <tbody>{data.items.map(tenant => <tr key={tenant.id}><td><Link className="tenant-link" to={`/tenants/${tenant.id}`}>{tenant.name}</Link></td>
-              <td>{tenant.contactEmail}</td><td className="date-cell">{date(tenant.createdAt)}</td>
+              <td>{tenant.contactEmail}</td><td><LicenseStatus status={tenant.license.status} /></td><td className="date-cell">{date(tenant.createdAt)}</td>
               <td><Link className="row-arrow" to={`/tenants/${tenant.id}`} aria-label={`${tenant.name} дэлгэрэнгүй`}>↗</Link></td></tr>)}</tbody></table></div>
         </> : <div className="empty-state"><span className="empty-symbol" aria-hidden="true">▦</span><h3>{data && data.totalCount > 0 ? 'Энэ хуудсанд бүртгэл алга' : 'Tenant бүртгэл алга'}</h3>
           <p>«Tenant бүртгэх» товчоор компани бүртгэнэ үү.</p></div>}
@@ -188,17 +192,56 @@ function TenantDetail() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [revision, setRevision] = useState(0)
+  const [updatingLicense, setUpdatingLicense] = useState(false)
+  const [licenseError, setLicenseError] = useState('')
+  const [licenseSuccess, setLicenseSuccess] = useState('')
+  const patchController = useRef<AbortController | null>(null)
+  useEffect(() => {
+    setLicenseError(''); setLicenseSuccess('')
+  }, [id])
   useEffect(() => {
     const controller = new AbortController()
+    patchController.current = null
+    setUpdatingLicense(false)
     setLoading(true); setError(''); setTenant(null)
-    api<Tenant>(`/platform/tenants/${id}`, { signal: controller.signal }).then(setTenant)
+    api<Tenant>(`/platform/tenants/${id}`, { signal: controller.signal })
+      .then(value => { if (!controller.signal.aborted) setTenant(value) })
       .catch((err: unknown) => { if (!controller.signal.aborted) setError(errorMessage(err)) })
       .finally(() => { if (!controller.signal.aborted) setLoading(false) })
-    return () => controller.abort()
+    return () => { controller.abort(); patchController.current?.abort() }
   }, [id, revision])
+
+  async function updateLicense() {
+    if (!tenant || patchController.current) return
+    const controller = new AbortController()
+    patchController.current = controller
+    setUpdatingLicense(true); setLicenseError(''); setLicenseSuccess('')
+    const status = tenant.license.status === 'active' ? 'inactive' : 'active'
+    try {
+      const license = await api<License>(`/platform/tenants/${tenant.id}/license`, {
+        method: 'PATCH', signal: controller.signal,
+        body: JSON.stringify({ status, version: tenant.license.version }),
+      })
+      if (controller.signal.aborted) return
+      setTenant(current => current?.id === tenant.id ? { ...current, license } : current)
+      setLicenseSuccess(license.status === 'active' ? 'License идэвхжлээ.' : 'License идэвхгүй боллоо.')
+    } catch (err) {
+      if (controller.signal.aborted) return
+      setLicenseError(errorMessage(err))
+      if (err instanceof ApiError && err.status === 409) setRevision(value => value + 1)
+    } finally {
+      if (!controller.signal.aborted) {
+        patchController.current = null
+        setUpdatingLicense(false)
+      }
+    }
+  }
+
   return <>
     <div className="breadcrumb"><Link to="/tenants">Tenant бүртгэл</Link><span>/</span>Дэлгэрэнгүй</div>
     <Link className="back-link" to="/tenants">← Жагсаалт руу буцах</Link>
+    {licenseError && <Notice>{licenseError}</Notice>}
+    {licenseSuccess && <div className="notice success" role="status">{licenseSuccess}</div>}
     {loading ? <div className="empty-state" role="status">Мэдээлэл ачаалж байна…</div>
       : error ? <><Notice>{error}</Notice><button className="secondary" onClick={() => setRevision(value => value + 1)}>Дахин оролдох</button></>
       : tenant && <><div className="page-heading"><div><span className="eyebrow muted">TENANT</span><h1>{tenant.name}</h1>
@@ -209,6 +252,17 @@ function TenantDetail() {
           <div><dt>Утас</dt><dd>{tenant.phone || 'Бүртгээгүй'}</dd></div>
           <div><dt>Бүртгэсэн огноо</dt><dd>{date(tenant.createdAt)}</dd></div>
           <div className="full-width"><dt>Tenant ID</dt><dd className="mono">{tenant.id}</dd></div>
-        </dl></section></>}
+        </dl></section>
+        <section className="license-section" aria-labelledby="license-title" aria-busy={updatingLicense}>
+          <div className="license-heading"><div><h2 id="license-title">Ашиглах эрх · License</h2>
+            <p className="description">Tenant-ийн платформ ашиглах эрхийг удирдана.</p></div>
+            <LicenseStatus status={tenant.license.status} /></div>
+          <dl className="license-meta"><dt>Сүүлд өөрчилсөн</dt>
+            <dd>{tenant.license.updatedAt ? date(tenant.license.updatedAt) : 'Өөрчлөлт хийгдээгүй'}</dd></dl>
+          <button disabled={updatingLicense} onClick={updateLicense}>
+            {updatingLicense ? 'Өөрчилж байна…' : tenant.license.status === 'active'
+              ? 'License идэвхгүй болгох' : 'License идэвхжүүлэх'}
+          </button>
+        </section></>}
   </>
 }

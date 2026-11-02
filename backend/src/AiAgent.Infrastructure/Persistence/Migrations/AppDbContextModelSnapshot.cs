@@ -51,6 +51,46 @@ namespace AiAgent.Infrastructure.Persistence.Migrations
                     b.ToTable("AuditEvents", (string)null);
                 });
 
+            modelBuilder.Entity("AiAgent.Domain.License", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAdminId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId")
+                        .IsUnique();
+
+                    b.HasIndex("UpdatedByAdminId");
+
+                    b.ToTable("Licenses", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Licenses_Status", "\"Status\" IN ('active', 'inactive')");
+                        });
+                });
+
             modelBuilder.Entity("AiAgent.Domain.Tenant", b =>
                 {
                     b.Property<Guid>("Id")
@@ -297,6 +337,20 @@ namespace AiAgent.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("AiAgent.Domain.License", b =>
+                {
+                    b.HasOne("AiAgent.Domain.Tenant", null)
+                        .WithOne("License")
+                        .HasForeignKey("AiAgent.Domain.License", "TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("AiAgent.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedByAdminId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
             modelBuilder.Entity("AiAgent.Domain.Tenant", b =>
                 {
                     b.HasOne("AiAgent.Infrastructure.Identity.ApplicationUser", null)
@@ -354,6 +408,12 @@ namespace AiAgent.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("AiAgent.Domain.Tenant", b =>
+                {
+                    b.Navigation("License")
                         .IsRequired();
                 });
 #pragma warning restore 612, 618

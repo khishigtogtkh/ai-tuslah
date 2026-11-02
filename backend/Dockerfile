@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/dotnet/sdk:10.0.402 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0.402@sha256:0d99ebf1ccad15037b5c98c9fe8979d6b8dbac23812feae2277a0b277b5c5ffa AS build
 WORKDIR /src
 
 COPY global.json ./
@@ -13,7 +13,7 @@ COPY backend/ ./backend/
 RUN dotnet publish backend/src/AiAgent.Api/AiAgent.Api.csproj \
     --configuration Release --no-restore --output /out /p:UseAppHost=false
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0.13 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0.13@sha256:d5633778c754e89a386882eddf8dbee6942447a8a4b8267c19cf1e1158d0b0ac AS runtime
 WORKDIR /app
 RUN mkdir -p /var/lib/ai-agent/keys \
     && chown -R app:app /var/lib/ai-agent \

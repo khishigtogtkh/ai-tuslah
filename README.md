@@ -1,14 +1,14 @@
 # AI Support Agent — Tenant бүртгэл
 
-Эхний хэсгийн хүрээ: платформын админ нэвтрэх, программ хөгжүүлэгч компанийг Tenant болгон бүртгэх, жагсаалт болон дэлгэрэнгүй харах. Tenant үүсгэсэн дотоод audit хадгална.
+Одоогийн хүрээ: платформын админ нэвтрэх, программ хөгжүүлэгч компанийг Tenant болгон бүртгэх, жагсаалт болон дэлгэрэнгүй харах, License-ийг идэвхжүүлэх/идэвхгүй болгох. Tenant үүсгэсэн болон License өөрчилсөн дотоод audit хадгална.
 
-License нь дараагийн хэсэгт `active` / `inactive` төлөвтэй нэмэгдэнэ. Одоогоор License хүснэгт, эрх олгох ажиллагаа, байгууллагын хэрэглэгч, урилга, мэдээлэл засах/устгах, AI Agent, SDK байхгүй. Tenant бүртгэл нь ашиглах эрх олгохгүй.
+License зөвхөн `active` / `inactive` төлөвтэй. Tenant бүртгэхэд автоматаар `inactive` License үүснэ; админ тусдаа идэвхжүүлнэ. Байгууллагын хэрэглэгч, урилга, Tenant мэдээлэл засах/устгах, AI Agent, SDK, License хугацаа, төлбөр байхгүй. License-ийн шалгалт нь дараагийн AI runtime-д ашиглах суурь бөгөөд одоогийн админы удирдлагыг хаахгүй.
 
 ## Бүтэц
 
 - `backend/src/AiAgent.Api` — HTTP API, нэвтрэлт, CSRF, админ provisioning.
-- `backend/src/AiAgent.Application` — Tenant use case, DTO, repository interface.
-- `backend/src/AiAgent.Domain` — Tenant, AuditEvent.
+- `backend/src/AiAgent.Application` — Tenant болон License use case, DTO, repository interface.
+- `backend/src/AiAgent.Domain` — Tenant, License, AuditEvent.
 - `backend/src/AiAgent.Infrastructure` — Identity, PostgreSQL, EF Core, migration.
 - `frontend` — React + TypeScript + Vite, Монгол хэлтэй гурван дэлгэц.
 - `scripts/backend.sh` — локал SDK, `.env`, Data Protection тохиргоог ачаалах wrapper.
@@ -44,7 +44,7 @@ cd /home/hishigtogtokh/ai-agent
 docker compose up -d
 ```
 
-Анх ажиллуулахад backend Docker image автоматаар build хийнэ. `db` healthy болсны дараа `be` асна. Backend нь `http://localhost:5000`, PostgreSQL нь `127.0.0.1:5433`. Docker сүлжээ дотор backend нь `db:5432`-оор холбогдоно.
+Анх ажиллуулахад backend Docker image автоматаар build хийнэ. SDK/runtime base image нь өмнө ашигласан хувилбарын digest-ээр тогтоогдсон. `db` healthy болсны дараа `be` асна. Backend нь `http://localhost:5000`, PostgreSQL нь `127.0.0.1:5433`. Docker сүлжээ дотор backend нь `db:5432`-оор холбогдоно.
 
 Frontend-ийг тусдаа terminal-д мөн repository root-оос:
 
@@ -86,13 +86,14 @@ docker compose stop
 
 ```bash
 docker compose up -d --wait db
+docker compose stop be
 bash scripts/backend.sh restore backend/AiAgent.slnx --locked-mode
 bash scripts/backend.sh build backend/AiAgent.slnx --no-restore
 bash scripts/backend.sh ef database update --project backend/src/AiAgent.Infrastructure --startup-project backend/src/AiAgent.Api --no-build
 docker compose up -d --build
 ```
 
-Migration нь Identity, Tenants, AuditEvents хүснэгтүүдийг үүсгэнэ. Сервер startup дээр migration автоматаар ажиллахгүй. EF командын өмнө шинэ migration-тай assembly-г build хийсэн байна.
+Migration-ууд нь Identity, Tenants, AuditEvents, Licenses хүснэгтүүдийг үүсгэнэ. `20261102125621_AddTenantLicenses` нь хуучин Tenant бүрд нэг `inactive` License үүсгэх бөгөөд үүнийг админы үйлдэл гэж audit-д бүртгэхгүй. Нөхсөн License-ийн `UpdatedAt`, `UpdatedByAdminId` нь null байна. Сервер startup дээр migration автоматаар ажиллахгүй. EF командын өмнө шинэ migration-тай assembly-г build хийсэн байна. Одоо байгаа database-д migration хийхээс өмнө backup авна.
 
 Ажиллаж буй Docker backend дээр админ үүсгэх:
 
@@ -147,14 +148,47 @@ DB болон backend хамт ажиллаж байгаа бол хоёулан
 | `GET /api/platform/tenants?page=1&pageSize=25` | Tenant жагсаалт |
 | `POST /api/platform/tenants` | Tenant үүсгэх |
 | `GET /api/platform/tenants/{id}` | Tenant дэлгэрэнгүй |
+| `PATCH /api/platform/tenants/{id}/license` | License төлөв өөрчлөх |
 
 Login JSON нь `email`, `password`. Tenant үүсгэх JSON нь `name`, `contactEmail`, `phone` (сонголттой, null байж болно). Нэр 200, имэйл 254, утас 32 тэмдэгтээс хэтрэхгүй. Нэр, имэйл заавал; ижил нэр/холбоо барих имэйлийг давхардал гэж хориглохгүй. Нэр, имэйл, утасны захын хоосон зайг цэвэрлэнэ.
 
-Tenant JSON: `id`, `name`, `contactEmail`, `phone`, `createdByAdminId`, `createdAt`. Огноо UTC. Үүсгэхэд `201` болон detail endpoint-ийн `Location` буцаана. Жагсаалт `{ items, totalCount, page, pageSize }` хэлбэртэй, `createdAt DESC, id DESC` эрэмбэтэй. Page 1-ээс, pageSize 1–100; default 25.
+Tenant JSON: `id`, `name`, `contactEmail`, `phone`, `createdByAdminId`, `createdAt`, `license`. Үүсгэх, жагсаалт, дэлгэрэнгүй хариу бүр `license` объекттой. Түүний талбарууд: `id`, `tenantId`, `status`, `version`, `createdAt`, `updatedAt`, `updatedByAdminId`. Огноо UTC. Үүсгэхэд `201` болон detail endpoint-ийн `Location` буцаана. Жагсаалт `{ items, totalCount, page, pageSize }` хэлбэртэй, `createdAt DESC, id DESC` эрэмбэтэй. Page 1-ээс, pageSize 1–100; default 25.
 
-Бүх POST-д эхлээд `/api/auth/csrf` дуудаж cookie болон `token` авна. Тухайн cookie-тойгоо `X-CSRF-TOKEN` header дамжуулна. Нэвтрэлтийн дараа шинэ identity-д тохирох token дахин авна; frontend үүнийг хүсэлт бүрд хийдэг.
+Бүх POST/PATCH-д эхлээд `/api/auth/csrf` дуудаж cookie болон `token` авна. Тухайн cookie-тойгоо `X-CSRF-TOKEN` header дамжуулна. Нэвтрэлтийн дараа шинэ identity-д тохирох token дахин авна; frontend үүнийг хүсэлт бүрд хийдэг.
 
-Алдаа `ProblemDetails`: `400` буруу өгөгдөл/CSRF, `401` нэвтрэлтгүй, `403` админ эрхгүй, `404` олдоогүй, `429` rate limit, `500` ерөнхий серверийн алдаа. `traceId` нь серверийн хүсэлттэй холбох ID. Хэрэглэгчийн нууц үг, cookie, CSRF token-ийг log-д бичихгүй.
+Алдаа `ProblemDetails`: `400` буруу өгөгдөл/CSRF, `401` нэвтрэлтгүй, `403` админ эрхгүй, `404` олдоогүй, `409` License version зөрчил, `429` rate limit, `500` ерөнхий серверийн алдаа. `traceId` нь серверийн хүсэлттэй холбох ID. Хэрэглэгчийн нууц үг, cookie, CSRF token-ийг log-д бичихгүй.
+
+## License удирдах
+
+1. Админаар нэвтрээд Tenant жагсаалтын License баганаас төлөв харна.
+2. Tenant-ийн дэлгэрэнгүйд орно.
+3. `inactive` үед «License идэвхжүүлэх», `active` үед «License идэвхгүй болгох» товч дарна.
+4. Төлөв болон сүүлд өөрчилсөн огноо серверийн хариугаар шинэчлэгдэнэ. Жагсаалт руу буцахад төлөвийг дахин ачаална.
+
+Тусдаа License дэлгэц болон GET endpoint байхгүй. Tenant үүсгэх форм License сонголт агуулахгүй.
+
+Хоёр үйлдэл нэг endpoint ашиглана:
+
+```http
+PATCH /api/platform/tenants/{id}/license
+Content-Type: application/json
+X-CSRF-TOKEN: <одоогийн session-ийн CSRF token>
+```
+
+```json
+{
+  "status": "active",
+  "version": "<Tenant хариуны license.version UUID>"
+}
+```
+
+`status` нь зөвхөн жижиг үсгийн `active` эсвэл `inactive`; `version` нь заавал хүчинтэй, хоосон биш UUID байна. Амжилттай үед `200` болон License объект буцаана. Үйлдэгч админыг backend өөрөө session-оос авна.
+
+Ижил төлөв хүссэн давтан хүсэлтэд одоогийн License-ийг `200`-гаар буцааж, version, өөрчилсөн огноо, audit-ийг өөрчлөхгүй. Өөр төлөв хүссэн боловч version хуучирсан эсвэл зэрэгцээ өөрчлөлт түрүүлж хадгалагдсан бол `409` буцаана. Frontend энэ үед мэдээллээ дахин ачаалж тайлбар харуулна; PATCH-ийг автоматаар давтахгүй.
+
+License өөрчлөлт бүр шинэ version-той болж, `LicenseActivated` / `LicenseDeactivated` audit-тай нэг transaction-д хадгалагдана. Зөрчил, database алдаа гарвал update болон audit хоёулаа буцна. License-ийн timestamp-ууд PostgreSQL-ийн microsecond нарийвчлалтай байна.
+
+`LicenseService.HasActiveLicenseAsync(tenantId)` нь License байгаа бөгөөд `active` үед true буцаана. License байхгүй болон `inactive` үед false. Энэ service нь ирээдүйн AI runtime-д зориулагдсан; одоогоор AI endpoint байхгүй. Идэвхгүй Tenant-ийг админ харах, дахин идэвхжүүлэх боломж хэвээр.
 
 ## Нэвтрэлт ба өгөгдлийн хамгаалалт
 
@@ -163,7 +197,7 @@ Tenant JSON: `id`, `name`, `contactEmail`, `phone`, `createdByAdminId`, `created
 - Production cookie Secure; HTTP development орчинд localhost дээр ажиллана.
 - Login: нэг IP-д минутанд 10 хүсэлт, таван буруу нууц үгийн дараа 15 минут account lockout. Ерөнхий алдааны мэдээлэл харуулна.
 - Tenant endpoint бүр backend дээр админ эрх шаарддаг. UI route guard нь нэмэлт UX хамгаалалт.
-- Tenant болон audit нэг SaveChanges transaction-д хадгалагдана. Хэсэгчилсэн бүртгэл үлдэхгүй.
+- Tenant, анхны License болон audit нэг SaveChanges transaction-д хадгалагдана. License өөрчлөлт, audit мөн нэг transaction-д хадгалагдана. Хэсэгчилсэн бүртгэл үлдэхгүй.
 - Data Protection keys нь `.data/keys` эсвэл `AI_AGENT_DATA_DIR/keys` дотор хадгалагдана. Wrapper 077 umask ашиглана; энэ хавтас Git-д орохгүй.
 - Production-д key storage-г тусдаа хамгаалсан persistent volume дээр хадгалж, backup болон дискний шифрлэлтийг deployment орчинд тохируулна. Олон instance ижил key store, application name ашиглана.
 
@@ -248,3 +282,14 @@ Frontend командууд `frontend/` дотор, backend командууд r
 | Зориуд унагасан тест / push | — | — | Хүлээгдэж байна |
 | Зориуд унагасан тест / PR | — | — | Хүлээгдэж байна |
 | Засварын push / PR | — | — | Хүлээгдэж байна |
+
+## License хэрэгжилтийн баталгаажуулалт — 2026-11-03
+
+- Backend Release build, Docker image build, frontend typecheck болон production build амжилттай. Одоо байгаа frontend API client-ийн 13/13 тест амжилттай; шинэ автомат тест нэмээгүй.
+- `20261102125621_AddTenantLicenses` локал database-д хэрэгжсэн. Өмнөх хоёр Tenant-д тус бүр нэг `inactive` License үүсэж, хуучин audit болон админы бүртгэл өөрчлөгдөөгүй. EF model болон migration snapshot зөрөөгүй.
+- Локал frontend proxy-оор админ login, Tenant үүсгэлт/жагсаалт/дэлгэрэнгүй, License идэвхжүүлэх/идэвхгүй болгох ажиллагааг шалгасан. Нэвтрэлтгүй PATCH 401, CSRF-гүй болон буруу status/version-той PATCH 400, олдоогүй Tenant 404, хуучирсан зөрчилтэй version 409 буцаасан.
+- Нэг License мөрийг түр түгжиж хоёр зэрэгцээ update хүлээлгэсний дараа нэг хүсэлт 200, нөгөө нь 409 буцаасан. Зөвхөн нэг audit хадгалагдсан; унасан хүсэлтийн audit буцсан.
+- Ижил төлөв рүү давтан хүсэлт хийхэд хариуны metadata өөрчлөгдөөгүй, audit нэмэгдээгүй. PATCH хариу болон database-аас дахин уншсан License ижил байсан.
+- Docker backend restart-ийн дараа session, License төлөв, version хадгалагдсан. Database болон backend нь хэвийн Compose service-ээр ажиллана.
+- Шалгалтад зориулан `License локал шалгалт 2026-11-02` нэртэй нэг Tenant нэмсэн; эцэст нь `inactive` болгосон. Migration-ээс өмнөх backup нь Git-д орохгүй `.data/backups/pre-license-20261102T125618Z.dump` дотор бий.
+- Browser-ийн бодит дүрслэл, GitHub CI run болон production deployment энэ ажлаар баталгаажаагүй.
