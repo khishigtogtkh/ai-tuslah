@@ -30,7 +30,7 @@ public sealed class TenantsController(TenantService tenants) : ControllerBase
     public async Task<IActionResult> Detail(Guid id, CancellationToken ct)
     {
         var tenant = await tenants.GetAsync(id, ct);
-        return tenant is null ? Problem(statusCode: 404, title: "Tenant олдсонгүй.") : Ok(tenant);
+        return tenant is null ? Problem(statusCode: 404, title: "Байгууллага олдсонгүй.") : Ok(tenant);
     }
 
     [HttpPost]
